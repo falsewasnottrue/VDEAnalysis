@@ -19,6 +19,19 @@ object VDEEmails extends App {
   println(hexString.size)
    */
 
+  val input = "aba0d509-dd4a-43fb-a2b4-789321b8b488,2021-07-20 07:16:49.574 UTC,2021-07-20 07:16:49.574 UTC,tkX7SKcusw03O00AtFjsk/rguilKahRSuQwjLzvVXCE="
+  val customerId = input.substring(0, input.indexOf(","))
+  val res = input.substring(input.lastIndexOf("UTC,") +4)
+  println(customerId)
+  println(res)
+
+  val digest = Base64.getDecoder.decode(res)
+  println(digest)
+
+  val hexString = bytesToHex(digest)
+  println(hexString)
+  println(hexString.size)
+
   def bytesToHex(digest: Array[Byte]): String = {
     val hexString = new StringBuilder()
     for (element <- digest) {

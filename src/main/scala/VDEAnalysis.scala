@@ -18,20 +18,23 @@ object VDEAnalysis extends App {
   val vdePath = "/Users/rkuschel/tmp/vermietet-de_emails_20210720.csv"
   val bufferedSource = Source.fromFile(vdePath)
 
-  val vdeEmails: List[String] = bufferedSource.getLines().toList.map { line =>
+  case class VdeEmail(customerId: String, hash: String)
+
+  val vdeEmails: List[VdeEmail] = bufferedSource.getLines().toList.map { line =>
+    val customerId = line.substring(0, line.indexOf(","))
     Try {
       val base64Email = line.substring(line.lastIndexOf("UTC,") + 4)
       val digest = Base64.getDecoder.decode(base64Email)
-      digest
+      (customerId, digest)
     }
   } collect {
-    case scala.util.Success(digest) =>
+    case scala.util.Success((customerId, digest)) =>
       val hexString = bytesToHex(digest)
-      hexString
+      VdeEmail(customerId, hexString)
   }
 
   println("VDE emails: " + vdeEmails.size) // 137056
-  if (vdeEmails.count(_.length != 64) != 0) {
+  if (vdeEmails.count(_.hash.length != 64) != 0) {
     throw new IllegalArgumentException("Unexpected SHA256 in VDE Emails")
   }
 
@@ -94,16 +97,37 @@ object VDEAnalysis extends App {
   // TODO duplicates?
 
   val found = new scala.collection.mutable.HashMap[Int, Int]()
+  val counted = new scala.collection.mutable.HashMap[Int, List[VdeEmail]]()
+
   // Check if Scout emails contain VDE emails
   for (email <- vdeEmails) {
-    if (scoutEmails.contains(email)) {
-      val count = scoutEmails.getOrElse(email, 1)
+    if (scoutEmails.contains(email.hash)) {
+      val count = scoutEmails.getOrElse(email.hash, 1)
       found.put(count, found.getOrElse(count, 0) + 1)
       // println("found: " + email + " " + scoutEmails.get(email))
+
+      if (count > 1) {
+        val listOfEmails = counted.getOrElse(count, Nil)
+        counted.put(count, listOfEmails :+ email)
+      }
     }
   }
 
   for (count <- found.keySet) {
     println(" " + count + " -> " + found.getOrElse(count, 0))
+  }
+
+  println("---")
+  for (count <- counted.keySet) {
+    val listOfEmails = counted.getOrElse(count, Nil)
+    println(" " + count + " -> " + listOfEmails.size)
+  }
+
+  println("---")
+  for (count <- counted.keySet) {
+    val listOfEmails = counted.getOrElse(count, Nil)
+    listOfEmails.foreach(email =>
+      println(count + "," + email.customerId + "," + email.hash)
+    )
   }
 }
